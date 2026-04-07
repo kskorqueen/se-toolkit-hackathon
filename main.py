@@ -4,7 +4,7 @@ import random
 from contextlib import contextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -26,7 +26,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS explanations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             term TEXT NOT NULL,
-            explanation TEXT NOT NULL
+            explanation TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'other'
         )
         """
     )
@@ -245,3 +246,81 @@ async def history():
         ).fetchall()
 
     return [{"id": r["id"], "term": r["term"], "explanation": r["explanation"]} for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# V2 Routes — Health check
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker."""
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# V2 Routes — Search, Delete, Stats, Popular terms
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/search")
+async def search_history(q: str = Query(..., min_length=1)):
+    """Search explanations by term or content (case-insensitive)."""
+    pattern = f"%{q}%"
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, term, explanation FROM explanations "
+            "WHERE term LIKE ? OR explanation LIKE ? "
+            "ORDER BY id DESC",
+            (pattern, pattern),
+        ).fetchall()
+
+    return [{"id": r["id"], "term": r["term"], "explanation": r["explanation"]} for r in rows]
+
+
+@app.delete("/api/history/{entry_id}")
+async def delete_entry(entry_id: int):
+    """Delete a single history entry by ID."""
+    with get_db() as conn:
+        cursor = conn.execute("DELETE FROM explanations WHERE id = ?", (entry_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Entry not found")
+
+    return {"deleted": entry_id}
+
+
+@app.delete("/api/history")
+async def clear_history():
+    """Delete all history entries."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM explanations")
+
+    return {"cleared": True}
+
+
+@app.get("/api/stats")
+async def stats():
+    """Return usage statistics."""
+    with get_db() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM explanations").fetchone()[0]
+        unique_terms = conn.execute(
+            "SELECT COUNT(DISTINCT LOWER(term)) FROM explanations"
+        ).fetchone()[0]
+
+    return {"total_explanations": total, "unique_terms": unique_terms}
+
+
+@app.get("/api/popular")
+async def popular(limit: int = Query(5, ge=1, le=20)):
+    """Return the most frequently requested terms."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT LOWER(term) as term, COUNT(*) as cnt "
+            "FROM explanations "
+            "GROUP BY LOWER(term) "
+            "ORDER BY cnt DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+
+    return [{"term": r["term"], "count": r["cnt"]} for r in rows]

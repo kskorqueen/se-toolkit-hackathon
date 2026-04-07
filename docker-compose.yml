@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    container_name: eli5-explainer
+    ports:
+      - "8000:8000"
+    volumes:
+      - db-data:/app/data
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
+
+volumes:
+  db-data:
+    driver: local
