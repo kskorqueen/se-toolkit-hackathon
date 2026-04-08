@@ -7,10 +7,10 @@
 ## 📸 Demo
 
 ### Main Screen
-![Main Screen](https://via.placeholder.com/800x450/7c3aed/ffffff?text=ELI5+AI+Explainer+-+Main+Screen)
+![Main Screen](static/screenshot-main.png)
 
-### History with Search & Delete
-![History](https://via.placeholder.com/800x450/a855f7/ffffff?text=History+with+Search+%26+Delete)
+### Explaining a Term
+![Example](static/screenshot-example.png)
 
 ---
 
@@ -103,6 +103,10 @@ sudo usermod -aG docker $USER
 git clone https://github.com/<your-username>/se-toolkit-hackathon.git
 cd se-toolkit-hakathon
 
+# (Optional) Change port if 8000 is already in use
+# Edit .env file and set HOST_PORT to a different port (e.g., 8080)
+# HOST_PORT=8080
+
 # Start with Docker Compose
 docker compose up -d --build
 
@@ -114,6 +118,49 @@ docker compose logs -f
 The app will be available at:
 ```
 http://<your-server-ip>:8000
+```
+
+Or if you changed the port in `.env`:
+```
+http://<your-server-ip>:<your-port>
+```
+
+### Troubleshooting
+
+#### Port Already in Use
+If you get an error that port 8000 is already in use:
+
+**Option 1: Change the port in `.env` file**
+```bash
+# Edit .env file
+nano .env
+
+# Change HOST_PORT to a different port
+HOST_PORT=8080
+
+# Restart the container
+docker compose down
+docker compose up -d
+```
+
+**Option 2: Find and stop the process using port 8000**
+```bash
+# Find what's using port 8000
+sudo lsof -i :8000
+
+# Stop the process (replace <PID> with the actual process ID)
+sudo kill -9 <PID>
+
+# Restart your container
+docker compose restart
+```
+
+#### Permission Issues with Database
+If you get permission errors with the SQLite database:
+```bash
+# Rebuild the container with the --force-recreate flag
+docker compose down
+docker compose up -d --build --force-recreate
 ```
 
 ### Stop
