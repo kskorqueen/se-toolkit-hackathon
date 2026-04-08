@@ -2,8 +2,7 @@ services:
   web:
     build: .
     container_name: eli5-explainer
-    ports:
-      - "8001:8000"
+    network_mode: host
     volumes:
       - db-data:/app/data
     environment:
